@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:google_maps_project/markers_model.dart';
+import 'package:google_maps_project/location_services.dart';
 
 class CustomeGoogleMap extends StatefulWidget {
   const CustomeGoogleMap({super.key});
@@ -12,11 +12,14 @@ class CustomeGoogleMap extends StatefulWidget {
 class _CustomeGoogleMapState extends State<CustomeGoogleMap> {
   late CameraPosition cameraPosition;
   late GoogleMapController googleMapController;
+  late LocationService locationService;
+  Set<Marker> currentMarker = {};
+
   @override
   void initState() {
-    cameraPosition = const CameraPosition(
-        zoom: 12, target: LatLng(31.16826661892613, 31.886835714332236));
-
+    cameraPosition = const CameraPosition(zoom: 12, target: LatLng(0, 0));
+    locationService = LocationService();
+    updateLocation();
     super.initState();
   }
 
@@ -26,10 +29,34 @@ class _CustomeGoogleMapState extends State<CustomeGoogleMap> {
     super.dispose();
   }
 
-  Set<Marker> markers = {};
-  Set<Polyline> plyLines = {};
-  Set<Polygon> polygons = {};
-  Set<Circle> circles = {};
+  void updateLocation() async {
+    bool locationServicesEnable = await locationService.checkLocationService();
+    if (locationServicesEnable) {
+      bool locationPermissionEnable =
+          await locationService.checkLocationPermission();
+      if (locationPermissionEnable) {
+        locationService.getRealTimeLocation((locationData) {
+          
+          googleMapController.animateCamera(CameraUpdate.newLatLng(
+              LatLng(locationData.latitude!, locationData.longitude!)));
+          Marker marker = Marker(
+              markerId: const MarkerId("1"),
+              position:
+                  LatLng(locationData.latitude!, locationData.longitude!));
+          currentMarker.add(marker);
+          setState(() {});
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text("Please enable Location Permisssion and Try again!!! ")));
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Please enable Location SerVices and Try again!!! ")));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -37,15 +64,11 @@ class _CustomeGoogleMapState extends State<CustomeGoogleMap> {
         alignment: Alignment.bottomCenter,
         children: [
           GoogleMap(
+            markers: currentMarker,
             zoomControlsEnabled: false,
-            polylines: plyLines,
-            polygons: polygons,
-            markers: markers,
-            circles: circles,
             initialCameraPosition: cameraPosition,
             onMapCreated: (controller) {
               googleMapController = controller;
-              updateMapStyle();
             },
           ),
           ElevatedButton(onPressed: () {}, child: const Text("GO TO"))
@@ -59,80 +82,4 @@ class _CustomeGoogleMapState extends State<CustomeGoogleMap> {
         .loadString("assets/GoogleMapsStyles/night_style.json");
     googleMapController.setMapStyle(mapStyle);
   }
-
-  void initMarkers() async {
-    var markerIcon = await BitmapDescriptor.fromAssetImage(
-        const ImageConfiguration(), "assets/images/m1.png");
-    var allMarkers = markersItems.map((item) {
-      return Marker(
-          markerId: MarkerId(item.id),
-          position: item.latLng,
-          infoWindow: InfoWindow(title: item.name),
-          icon: markerIcon);
-    }).toSet();
-    //   markers.addAll(allMarkers);
-    //   setState(() {});
-  }
-
-  void initpolygons() {
-    Polygon polygon1 = Polygon(
-        fillColor: Colors.black26.withOpacity(0.5),
-        strokeWidth: 4,
-        polygonId: const PolygonId("1"),
-        holes: const [
-          [
-            LatLng(31.16415382713063, 31.883745809628998),
-            LatLng(31.1572498109441, 31.873617788657263),
-            LatLng(31.15534010063516, 31.891298910014697),
-          ],
-        ],
-        points: const [
-          LatLng(31.167532204915513, 31.84031548241122),
-          LatLng(31.138885618030514, 31.861601492589102),
-          LatLng(31.134183812775937, 31.946745533300632),
-          LatLng(31.1744354718105, 31.884089132373802),
-        ]);
-    polygons.add(polygon1);
-  }
-
-  void initCircles() {
-    Circle circle1 = Circle(
-        circleId: const CircleId("1"),
-        fillColor: Colors.redAccent.withOpacity(0.4),
-        strokeWidth: 2,
-        radius: 2000,
-        center: const LatLng(31.16885414603498, 31.88786568256665));
-    circles.add(circle1);
-  }
-
-  // void initPolyLines() {
-  //   Polyline polyline1 =  const Polyline(
-  //       color: Colors.red,
-  //       endCap: Cap.roundCap,
-  //       startCap: Cap.roundCap,
-  //       geodesic: true,
-  //       zIndex: 3,
-  //       width: 4,
-  //       patterns:[
-  //         PatternItem.dot
-  //       ],
-  //       points: [
-  //         LatLng(31.173701105631487, 31.86434807454754),
-  //         LatLng(31.149463827554538, 31.9220262956747),
-  //       ],
-  //       polylineId: PolylineId('1'));
-  //   Polyline polyline2 = const Polyline(
-  //       color: Colors.red,
-  //       endCap: Cap.roundCap,
-  //       startCap: Cap.roundCap,
-  //       geodesic: true,
-  //       zIndex: 1,
-  //       width: 4,
-  //       points: [
-  //         LatLng(31.15974706635814, 31.880827566298155),
-  //         LatLng(31.17854781717457, 31.953268665451915),
-  //       ],
-  //       polylineId: PolylineId('2'));
-  //   plyLines.addAll([polyline1, polyline2]);
-  // }
 }
